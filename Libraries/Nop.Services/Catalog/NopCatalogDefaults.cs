@@ -5,6 +5,23 @@
     /// </summary>
     public static partial class NopCatalogDefaults
     {
+        #region Companies
+
+        /// <summary>
+        /// Gets a key for caching
+        /// </summary>
+        /// <remarks>
+        /// {0} : category ID
+        /// </remarks>
+        public static string CompaniesByIdCacheKey => "Nop.company.id-{0}";
+
+        /// <summary>
+        /// Gets a key pattern to clear cache
+        /// </summary>
+        public static string CompaniesPrefixCacheKey => "Nop.company.";
+
+        #endregion
+
         #region Categories
 
         /// <summary>
