@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Nop.Core.Domain.Catalog
 {
-    public class Company : BaseEntity, ILocalizedEntity
+    public partial class Company : BaseEntity, ILocalizedEntity
     {
         public string Name { get; set; }
 
