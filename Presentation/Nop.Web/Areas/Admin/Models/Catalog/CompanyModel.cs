@@ -46,6 +46,8 @@ namespace Nop.Web.Areas.Admin.Models.Catalog
         public bool Deleted { get; set; }
 
         public IList<CategoryLocalizedModel> Locales { get; set; }
+
+        #endregion
     }
 
     public partial class CompanyLocalizedModel : ILocalizedLocaleModel
