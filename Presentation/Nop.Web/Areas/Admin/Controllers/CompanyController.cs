@@ -23,16 +23,17 @@ using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
 using Nop.Web.Framework.Mvc.Filters;
+using Nop.Core.Infrastructure;
 
 namespace Nop.Web.Areas.Admin.Controllers
 {
-    public class CompanyController : Controller
+    public partial class CompanyController : BaseAdminController
     {
         #region Fields
 
         private readonly IAclService _aclService;
-        private readonly ICategoryModelFactory _categoryModelFactory;
-        private readonly ICategoryService _categoryService;
+        private readonly ICompanyModelFactory _companyModelFactory;
+        private readonly ICompanyService _companyService;
         private readonly ICustomerActivityService _customerActivityService;
         private readonly ICustomerService _customerService;
         private readonly IDiscountService _discountService;
@@ -54,8 +55,8 @@ namespace Nop.Web.Areas.Admin.Controllers
         #region Ctor
 
         public CompanyController(IAclService aclService,
-            ICategoryModelFactory categoryModelFactory,
-            ICategoryService categoryService,
+            ICompanyModelFactory companyModelFactory,
+            ICompanyService companyService,
             ICustomerActivityService customerActivityService,
             ICustomerService customerService,
             IDiscountService discountService,
@@ -73,8 +74,8 @@ namespace Nop.Web.Areas.Admin.Controllers
             IWorkContext workContext)
         {
             _aclService = aclService;
-            _categoryModelFactory = categoryModelFactory;
-            _categoryService = categoryService;
+            _companyModelFactory = companyModelFactory;
+            _companyService = companyService;
             _customerActivityService = customerActivityService;
             _customerService = customerService;
             _discountService = discountService;
@@ -93,9 +94,169 @@ namespace Nop.Web.Areas.Admin.Controllers
         }
 
         #endregion
-        public IActionResult Index()
+        #region List
+
+        public virtual IActionResult Index()
         {
-            return View();
+            return RedirectToAction("List");
         }
+
+        public virtual IActionResult List()
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedView();
+
+            //prepare model
+            var model = _companyModelFactory.PrepareCompanySearchModel(new CompanySearchModel());
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public virtual IActionResult List(CompanySearchModel searchModel)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedDataTablesJson();
+
+            //prepare model
+            var model = _companyModelFactory.PrepareCompanyListModel(searchModel);
+
+            return Json(model);
+        }
+
+        #endregion
+
+        #region Create / Edit / Delete
+
+        public virtual IActionResult Create()
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedView();
+
+            //prepare model
+            var model = _companyModelFactory.PrepareCompanyModel(new CompanyModel(), null);
+
+            return View(model);
+        }
+
+        [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
+        public virtual IActionResult Create(CompanyModel model, bool continueEditing)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedView();
+
+            if (ModelState.IsValid)
+            {
+                var company = model.ToEntity<Company>();
+                company.CreatedOnUtc = DateTime.UtcNow;
+                company.UpdatedOnUtc = DateTime.UtcNow;
+                _companyService.InsertCompany(company);
+
+                //_categoryService.UpdateCategory(category);
+
+                //activity log
+                _customerActivityService.InsertActivity("AddNewCompany",
+                    string.Format(_localizationService.GetResource("ActivityLog.AddNewCompany"), company.Name), company);
+
+                _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Catalog.Companies.Added"));
+
+                if (!continueEditing)
+                    return RedirectToAction("List");
+
+                return RedirectToAction("Edit", new { id = company.Id });
+            }
+
+            //prepare model
+            model = _companyModelFactory.PrepareCompanyModel(model, null, true);
+
+            //if we got this far, something failed, redisplay form
+            return View(model);
+        }
+
+        public virtual IActionResult Edit(int id)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedView();
+
+            //try to get a category with the specified id
+            var company = _companyService.GetCompanyById(id);
+            if (company == null || company.Deleted)
+                return RedirectToAction("List");
+
+            //prepare model
+            var model = _companyModelFactory.PrepareCompanyModel(null, company);
+
+            return View(model);
+        }
+
+        [HttpPost, ParameterBasedOnFormName("save-continue", "continueEditing")]
+        public virtual IActionResult Edit(CompanyModel model, bool continueEditing)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedView();
+
+            //try to get a category with the specified id
+            var company = _companyService.GetCompanyById(model.Id);
+            if (company == null || company.Deleted)
+                return RedirectToAction("List");
+
+            if (ModelState.IsValid)
+            {
+                var prevPictureId = company.PictureId;
+
+                company = model.ToEntity(company);
+                company.UpdatedOnUtc = DateTime.UtcNow;
+                _companyService.UpdateCompany(company);
+
+                //delete an old picture (if deleted or updated)
+                if (prevPictureId > 0 && prevPictureId != company.PictureId)
+                {
+                    var prevPicture = _pictureService.GetPictureById(prevPictureId);
+                    if (prevPicture != null)
+                        _pictureService.DeletePicture(prevPicture);
+                }
+
+                //activity log
+                _customerActivityService.InsertActivity("EditCompany",
+                    string.Format(_localizationService.GetResource("ActivityLog.EditCompany"), company.Name), company);
+
+                _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Catalog.Companies.Updated"));
+
+                if (!continueEditing)
+                    return RedirectToAction("List");
+
+                return RedirectToAction("Edit", new { id = company.Id });
+            }
+
+            //prepare model
+            model = _companyModelFactory.PrepareCompanyModel(model, company, true);
+
+            //if we got this far, something failed, redisplay form
+            return View(model);
+        }
+
+        [HttpPost]
+        public virtual IActionResult Delete(int id)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCategories))
+                return AccessDeniedView();
+
+            //try to get a category with the specified id
+            var company = _companyService.GetCompanyById(id);
+            if (company == null)
+                return RedirectToAction("List");
+
+            _companyService.DeleteCompany(company);
+
+            //activity log
+            _customerActivityService.InsertActivity("DeleteCompany",
+                string.Format(_localizationService.GetResource("ActivityLog.DeleteCompany"), company.Name), company);
+
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Catalog.Companies.Deleted"));
+
+            return RedirectToAction("List");
+        }
+
+        #endregion
     }
 }
