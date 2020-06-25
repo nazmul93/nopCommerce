@@ -32,3 +32,4 @@ Tests/Nop.Services.Tests/bin/
 Tests/Nop.Core.Tests/obj/
 Tests/Nop.Core.Tests/bin/
 Libraries/Nop.Core/obj/
+Presentation/Nop.Web/Nop.Web.csproj.user
